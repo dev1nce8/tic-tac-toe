@@ -1,25 +1,89 @@
 const BOARD_SIZE = 3;
-const MARKER_X = "x";
 const MARKER_O = "o";
+const MARKER_X = "x";
 
-const TicTacToe = (function () {
-  let gameBoard = createGameBoard();
-  let currentTurn = 1;
+//Create a gameController that handles the game flow
+(function GameController() {
+  let winner = null;
+  const playerOne = Player("player one", MARKER_O);
+  const playerTwo = Player("player Two", MARKER_X);
+  const gameBoard = Gameboard({
+    size: 3,
+    playerOneMarker: playerOne.marker,
+    playerTwoMarker: playerTwo.marker,
+  });
 
-  // public methods
-  const getBlocks = () => gameBoard;
-  const markBlock = (y, x) => {
-    if (gameBoard[y][x].getMarker()) return;
-    const marker = currentTurn === 1 ? MARKER_X : MARKER_O;
-    gameBoard[y][x].setMarker(marker);
-    currentTurn = currentTurn === 1 ? 2 : 1;
-    return evaluate();
+  // GAME LOGIC
+  function play() {
+    const currentTurn = gameBoard.getCurrentTurn();
+    const move = prompt(`${currentTurn}'s turn'`);
+    const [y, x] = [Number(move[0]), Number(move[1])];
+
+    gameBoard.play(y, x);
+    gameBoard.switchTurn();
+    draw();
+    winner = gameBoard.evaluate();
+  }
+
+  function draw() {
+    console.clear();
+    const board = gameBoard.getBoard();
+    board.forEach((row) => {
+      console.log(row);
+    });
+  }
+  while (!winner) {
+    play();
+  }
+
+  if (winner === "o") {
+    console.log("Player One Wins! Congrats");
+  } else {
+    console.log("Player Two Wins! Congrats");
+  }
+})();
+
+/* 
+  Create a Gameboard object that stores the cells that the user can click
+  Create a Player object
+  Create a gameController that handles the game flow
+  Create a uiController that handles UI
+
+  Little to not global code as possible
+  Try to place a much as you can inside factories
+  Wrap the factory inside IIFE if only one instance
+*/
+
+// Create a Gameboard object that stores the cells that the user can click
+function Gameboard({ size, playerOneMarker, playerTwoMarker }) {
+  const board = [];
+  const p1Marker = playerOneMarker;
+  const p2Marker = playerTwoMarker;
+  let currentTurn = p1Marker;
+  let winningMark = null;
+
+  // generates a board
+  for (let y = 0; y < size; y++) {
+    const row = [];
+    for (let x = 0; x < size; x++) {
+      row.push(null);
+    }
+    board.push(row);
+  }
+  // Main Logic
+
+  const play = (y, x) => {
+    if (board[y][x]) return;
+    board[y][x] = currentTurn;
   };
-  const resetBlocks = () => {
-    gameBoard = createGameBoard();
-  };
 
-  // private methods
+  const getWinningMark = () => winningMark;
+
+  // PRIVATE METHODS
+
+  function switchTurn() {
+    currentTurn = currentTurn === p1Marker ? p2Marker : p1Marker;
+  }
 
   function evaluate() {
     //prettier-ignore
@@ -34,12 +98,9 @@ const TicTacToe = (function () {
       [[0,2],[1,2],[2,2]],
     ];
     for (let i = 0; i < winningComb.length; i++) {
-      const mark1 =
-        gameBoard[winningComb[i][0][0]][winningComb[i][0][1]].getMarker();
-      const mark2 =
-        gameBoard[winningComb[i][1][0]][winningComb[i][1][1]].getMarker();
-      const mark3 =
-        gameBoard[winningComb[i][2][0]][winningComb[i][2][1]].getMarker();
+      const mark1 = board[winningComb[i][0][0]][winningComb[i][0][1]];
+      const mark2 = board[winningComb[i][1][0]][winningComb[i][1][1]];
+      const mark3 = board[winningComb[i][2][0]][winningComb[i][2][1]];
       if (mark1 === mark2 && mark2 === mark3) {
         return mark1;
       }
@@ -47,67 +108,28 @@ const TicTacToe = (function () {
     return null;
   }
 
-  function createGameBoard() {
-    const board = [];
-    for (let y = 0; y < BOARD_SIZE; y++) {
-      const row = [];
-      for (let x = 0; x < BOARD_SIZE; x++) {
-        row.push(createBlock(y, x));
-      }
-      board.push(row);
-    }
+  function getBoard() {
     return board;
   }
 
-  function createBlock(y, x) {
-    // IFFE method that returns the y,x position
-    // this way it can't be modified outside
-    let marker = null;
-    const getPos = () => ({ y, x });
-    const setMarker = (m) => (marker = m);
-    const getMarker = () => marker;
-    return { getPos, setMarker, getMarker };
+  function getCurrentTurn() {
+    return currentTurn;
   }
 
-  return { getBlocks, markBlock, resetBlocks };
-})();
-
-const boardEl = document.getElementById("board");
-function displayBlocks(blocks, markers) {
-  boardEl.innerHTML = "";
-  blocks.forEach((b) => {
-    const blockEl = document.createElement("div");
-    const markerImg = document.createElement("img");
-    blockEl.className = "block";
-    markerImg.className = "marker";
-
-    if (b.getMarker() === MARKER_X) markerImg.src = "./asset/sword.svg";
-    else if (b.getMarker() === MARKER_O) {
-      markerImg.src = "./asset/shield.svg";
-    }
-    blockEl.dataset.y = b.getPos().y;
-    blockEl.dataset.x = b.getPos().x;
-
-    blockEl.append(markerImg);
-    boardEl.append(blockEl);
-
-    blockEl.addEventListener("click", (e) => {
-      const b = e.target;
-      const winningMark = TicTacToe.markBlock(b.dataset.y, b.dataset.x);
-      let flattenBlocksArray = TicTacToe.getBlocks().flat();
-
-      if (winningMark) {
-        const player = winningMark === MARKER_O ? "Player Two" : "Player One";
-        alert(`${player} WINS!`); // TODO: add a UI to dispaly the winner instead of just alert
-        TicTacToe.resetBlocks();
-        flattenBlocksArray = TicTacToe.getBlocks().flat(); // re-evaluate the flatten array to the new value of the gameboard;
-      }
-
-      displayBlocks(flattenBlocksArray);
-    });
-  });
+  return {
+    play,
+    getWinningMark,
+    evaluate,
+    switchTurn,
+    getBoard,
+    getCurrentTurn,
+  };
 }
 
-// MAIN PROCESS
-const flattenBlocksArray = TicTacToe.getBlocks().flat();
-displayBlocks(flattenBlocksArray);
+// Create a Player object
+function Player(name, marker) {
+  return { name, marker };
+}
+
+//   Create a uiController that handles UI
+function UiController() {}
